@@ -1,23 +1,62 @@
+from flask import Flask, request
 import requests
+import json
+from config import TOKEN, PHONE_NUMBER_ID
 
-ACCESS_TOKEN = "EAAkg8OnHOPQBP46ZAtk9KyirSfo37Gv5NZBx5ZCitR7DgEXAMj1ALseLkN3vaGDm4N2ZC6GfiRIIVHZA7tm3plgZC4DQQHyi0ciONt0D5dU8hvzsZAHwwW8u5IaHteesPYFUP9JnuP1vuY8KZCzfb1e1ZBiHAZCJauto8ZAWiJDZBxg0UGZB6WML0OlZBn80DrD4kMQZBSJmwZDZD"
-PHONE_NUMBER_ID = "851654494696380"
-TO = "919478372154"  # 👈 your WhatsApp number with country code (no +)
+app = Flask(__name__)
 
-url = f"https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages"
+VERIFY_TOKEN = "prothonbot"  # you can change this to anything you like
 
-headers = {
-    "Authorization": f"Bearer {ACCESS_TOKEN}",
-    "Content-Type": "application/json"
-}
+# ✅ Webhook verification
+@app.route("/webhook", methods=["GET"])
+def verify_webhook():
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
 
-data = {
-    "messaging_product": "whatsapp",
-    "to": TO,
-    "type": "text",
-    "text": {"body": "Hello World!"}
-}
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        print("Webhook verified successfully.")
+        return challenge
+    else:
+        return "Verification failed", 403
 
-response = requests.post(url, headers=headers, json=data)
-print(response.status_code)
-print(response.text)
+
+# ✅ Receive messages
+@app.route("/webhook", methods=["POST"])
+def receive_message():
+    data = request.get_json()
+    print(json.dumps(data, indent=2))
+
+    try:
+        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+        sender = message["from"]
+        text = message["text"]["body"]
+
+        print(f"Message from {sender}: {text}")
+        send_message(sender, f"You said: {text}")
+    except Exception as e:
+        print("Error:", e)
+
+    return "ok", 200
+
+
+# ✅ Function to send message
+def send_message(to, message):
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message}
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("Message send status:", response.status_code)
+    print(response.text)
+
+
+if __name__ == "_main_":
+    app.run(host="0.0.0.0", port=5000, debug=True)
