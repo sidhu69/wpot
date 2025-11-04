@@ -1,62 +1,57 @@
 from flask import Flask, request
 import requests
-import json
-from config import TOKEN, PHONE_NUMBER_ID
+from config import TOKEN, PHONE_NUMBER_ID, VERIFY_TOKEN
 
-app = Flask(__name__)
+app = Flask(_name_)
 
-VERIFY_TOKEN = "prothonbot"  # you can change this to anything you like
-
-# ✅ Webhook verification
-@app.route("/webhook", methods=["GET"])
-def verify_webhook():
-    mode = request.args.get("hub.mode")
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        print("Webhook verified successfully.")
-        return challenge
-    else:
-        return "Verification failed", 403
-
-
-# ✅ Receive messages
-@app.route("/webhook", methods=["POST"])
-def receive_message():
-    data = request.get_json()
-    print(json.dumps(data, indent=2))
-
-    try:
-        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
-        sender = message["from"]
-        text = message["text"]["body"]
-
-        print(f"Message from {sender}: {text}")
-        send_message(sender, f"You said: {text}")
-    except Exception as e:
-        print("Error:", e)
-
-    return "ok", 200
-
-
-# ✅ Function to send message
-def send_message(to, message):
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
+def send_whatsapp_message(to, text):
+    """Send a WhatsApp message using Meta API"""
+    url = f"https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json"
     }
-    payload = {
+    data = {
         "messaging_product": "whatsapp",
         "to": to,
-        "type": "text",
-        "text": {"body": message}
+        "text": {"body": text}
     }
-    response = requests.post(url, headers=headers, json=payload)
-    print("Message send status:", response.status_code)
-    print(response.text)
+    response = requests.post(url, headers=headers, json=data)
+    print("Message sent:", response.status_code, response.text)
 
 
-if __name__ == "_main_":
+@app.route("/webhook", methods=["GET", "POST"])
+def webhook():
+    """Handle webhook verification and messages"""
+    if request.method == "GET":
+        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
+            return request.args.get("hub.challenge")
+        return "Invalid verification token", 403
+
+    data = request.get_json()
+    print("Incoming data:", data)
+
+    if data and "entry" in data:
+        for entry in data["entry"]:
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                messages = value.get("messages", [])
+                for message in messages:
+                    phone = message["from"]
+                    text = message.get("text", {}).get("body", "").lower()
+
+                    # Simple command-based system
+                    if text == "hello":
+                        send_whatsapp_message(phone, "Hello! I’m alive 😊")
+                    elif text.startswith("weather"):
+                        send_whatsapp_message(phone, "Weather feature coming soon 🌤️")
+                    elif text.startswith("news"):
+                        send_whatsapp_message(phone, "News feature coming soon 🗞️")
+                    else:
+                        send_whatsapp_message(phone, "I didn’t understand that command 🤔")
+
+    return "OK", 200
+
+
+if _name_ == "_main_":
     app.run(host="0.0.0.0", port=5000, debug=True)
