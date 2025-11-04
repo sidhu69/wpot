@@ -2,7 +2,7 @@ from flask import Flask, request
 import requests
 from config import TOKEN, PHONE_NUMBER_ID, VERIFY_TOKEN
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 def send_whatsapp_message(to, text):
     """Send a WhatsApp message using Meta API"""
@@ -53,5 +53,5 @@ def webhook():
     return "OK", 200
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
